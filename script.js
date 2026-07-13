@@ -455,6 +455,27 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
   loadDB();
   renderPeriodBars(); renderFilter(); renderMenu(); renderOrders(); renderReport();
 
+  // ===== SLIDESHOW PANEL LOGIN (geser kanan ke kiri, otomatis) =====
+  (function(){
+    const slider = document.getElementById('loginSlider');
+    if(!slider) return;
+    const imgs = slider.querySelectorAll('.ls-img');
+    const len = imgs.length;
+    if(!len) return;
+    imgs[0].classList.add('active');
+    if(len < 2) return;
+    let cur = 0;
+    function show(n){
+      const prev = cur; cur = (n+len)%len;
+      imgs.forEach((im,i)=>{
+        if(i===cur){ im.classList.remove('prev'); im.classList.add('active'); }
+        else if(i===prev){ im.classList.remove('active'); im.classList.add('prev'); }
+        else { im.style.transition='none'; im.classList.remove('active','prev'); void im.offsetWidth; im.style.transition=''; }
+      });
+    }
+    setInterval(()=>show(cur+1), 3500);
+  })();
+
   // keluar: kembali ke layar login
   document.getElementById('logoutBtn').addEventListener('click', () => {
     document.getElementById('adminApp').style.display = 'none';
