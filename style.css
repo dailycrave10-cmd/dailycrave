@@ -64,6 +64,11 @@
     0%{transform:scale(1) translate(0,0)}
     100%{transform:scale(1.09) translate(-1.5%,1%)}
   }
+  /* slideshow panel login */
+  .ls-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:translateX(100%);transition:transform .8s cubic-bezier(.5,0,.2,1)}
+  .ls-img.active{transform:translateX(0)}
+  .ls-img.prev{transform:translateX(-100%)}
+  .hero-photo::after{z-index:2}
 
   /* cahaya latar bergerak pelan */
   .brand-side .glow{
