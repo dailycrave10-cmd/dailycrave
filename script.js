@@ -239,13 +239,20 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
   modalPhotoInput.addEventListener('change', e => {
     const file = e.target.files[0]; if(!file) return;
     const reader = new FileReader();
-    reader.onload = () => { modalPhoto = reader.result; setThumb(modalPhoto, 'Foto dipilih — Klik Jika Ingin Ganti'); };
+    reader.onload = () => { modalPhoto = reader.result; mPhotoUrl.value=''; setThumb(modalPhoto, 'Foto dipilih — Klik Jika Ingin Ganti'); };
     reader.readAsDataURL(file); modalPhotoInput.value = '';
+  });
+  // isi foto lewat URL
+  const mPhotoUrl = document.getElementById('mPhotoUrl');
+  mPhotoUrl.addEventListener('input', () => {
+    const url = mPhotoUrl.value.trim();
+    if(url){ modalPhoto = url; setThumb(url, 'Pratinjau dari URL'); }
+    else { setThumb(editingId ? (menus.find(x=>x.id===editingId)||{}).img : null, 'Klik Untuk Unggah Foto'); }
   });
   const mAvailable = document.getElementById('mAvailable');
   const mBest = document.getElementById('mBest');
-  document.getElementById('addBtn').onclick = () => { editingId=null; modalTitle.textContent='Tambah Menu'; mName.value=''; mPrice.value=''; mDesc.value=''; modalPhoto=null; setThumb(null,'Ketuk untuk unggah dari perangkat'); mAvailable.checked=true; mBest.checked=false; renderCategoryOptions(); mCategory.value = (activeFilter!=='Semua' ? activeFilter : (categories[0]||'')); openModal(); };
-  function editMenu(id){ const m=menus.find(x=>x.id===id); if(!m) return; editingId=id; modalTitle.textContent='Edit Menu'; mName.value=m.name; mPrice.value=m.price; mDesc.value=m.desc; modalPhoto=null; setThumb(m.img,'Foto saat ini — Klik Jika Ingin ganti'); mAvailable.checked=m.available; mBest.checked=m.best; renderCategoryOptions(); mCategory.value = m.category || (categories[0]||''); openModal(); }
+  document.getElementById('addBtn').onclick = () => { editingId=null; modalTitle.textContent='Tambah Menu'; mName.value=''; mPrice.value=''; mDesc.value=''; modalPhoto=null; mPhotoUrl.value=''; setThumb(null,'Ketuk untuk unggah dari perangkat'); mAvailable.checked=true; mBest.checked=false; renderCategoryOptions(); mCategory.value = (activeFilter!=='Semua' ? activeFilter : (categories[0]||'')); openModal(); };
+  function editMenu(id){ const m=menus.find(x=>x.id===id); if(!m) return; editingId=id; modalTitle.textContent='Edit Menu'; mName.value=m.name; mPrice.value=m.price; mDesc.value=m.desc; modalPhoto=null; mPhotoUrl.value = (m.img && /^https?:\/\//.test(m.img)) ? m.img : ''; setThumb(m.img,'Foto saat ini — Klik Jika Ingin ganti'); mAvailable.checked=m.available; mBest.checked=m.best; renderCategoryOptions(); mCategory.value = m.category || (categories[0]||''); openModal(); }
   function deleteMenu(id){ const m=menus.find(x=>x.id===id); if(!m) return; askConfirm('Hapus menu "'+m.name+'"?', ()=>{ menus=menus.filter(x=>x.id!==id); renderMenu(); deleteMenuDB(id); toast('Menu dihapus'); }); }
   document.getElementById('cancelBtn').onclick = closeModal;
   overlay.addEventListener('click', e => { if(e.target===overlay) closeModal(); });
