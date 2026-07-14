@@ -337,8 +337,8 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     return `<tr>
       <td class="o-id">#${o.id}</td>
       <td class="o-time">${fmtDateTime(o.date)}</td>
-      <td>${o.cust}</td>
-      <td>${o.item}</td>
+      <td>${o.cust}${o.alamat ? '<div class="o-extra">📍 '+o.alamat+'</div>' : ''}</td>
+      <td>${o.item}${o.note ? '<div class="o-extra note">📝 '+o.note+'</div>' : ''}</td>
       <td class="o-total">${rupiah(o.total)}</td>
       <td><span class="pill ${o.status}">${o.status}</span></td>
       <td><div class="o-actions">${actionBtn}<button class="obtn" onclick="deleteOrder(${o.id})">Hapus</button></div></td>
@@ -444,7 +444,7 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
       }
       const { data: oData } = await db.from('orders').select('*').order('created_at', { ascending:false });
       if(Array.isArray(oData)){
-        orders = oData.map(x => ({ id:x.id, cust:x.cust, item:x.item, total:x.total, status:x.status, date: x.created_at ? new Date(x.created_at) : new Date() }));
+        orders = oData.map(x => ({ id:x.id, cust:x.cust, item:x.item, total:x.total, status:x.status, alamat:x.alamat, note:x.note, date: x.created_at ? new Date(x.created_at) : new Date() }));
       }
     }catch(e){ console.error('Gagal memuat data:', e); }
   }
