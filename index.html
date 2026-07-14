@@ -128,6 +128,19 @@
   .btn-wa{width:100%;justify-content:center;color:#fff;background:#25925a;box-shadow:0 10px 22px -10px rgba(37,146,90,.7)}
   .btn-wa:hover{filter:brightness(1.06)}
   .btn-wa:disabled{background:var(--cream-2);color:var(--muted);cursor:not-allowed;box-shadow:none}
+  /* animasi sukses pesanan */
+  .order-success{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;background:rgba(42,23,16,.55);backdrop-filter:blur(3px)}
+  .order-success.show{display:flex;animation:osFade .25s ease}
+  @keyframes osFade{from{opacity:0}to{opacity:1}}
+  .os-card{background:var(--white);border-radius:22px;padding:38px 32px;text-align:center;max-width:340px;width:86%;box-shadow:0 30px 60px -20px rgba(0,0,0,.45);transform:scale(.85);opacity:0;transition:transform .45s cubic-bezier(.2,.8,.2,1),opacity .45s}
+  .order-success.show .os-card{transform:none;opacity:1}
+  .os-check{width:92px;height:92px;margin:0 auto 18px;border-radius:50%;background:#e8f5ec;display:grid;place-items:center}
+  .os-check svg{width:54px;height:54px}
+  .os-check .c1{stroke:#25925a;stroke-width:3;fill:none;stroke-dasharray:151;stroke-dashoffset:151;animation:osDraw .5s ease .15s forwards}
+  .os-check .c2{stroke:#25925a;stroke-width:4;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:44;stroke-dashoffset:44;animation:osDraw .4s ease .55s forwards}
+  @keyframes osDraw{to{stroke-dashoffset:0}}
+  .os-card h3{font-family:'Fraunces',serif;font-size:22px;margin-bottom:8px;color:var(--choc)}
+  .os-card p{font-size:14px;color:var(--muted);line-height:1.55}
 
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--choc);color:var(--cream);padding:13px 22px;border-radius:12px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:.3s;z-index:80;box-shadow:0 12px 30px -10px rgba(0,0,0,.5)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -162,7 +175,7 @@
   <div class="wrap">
     <div class="hero-text">
       <p class="hero-eyebrow">Homemade • Premium</p>
-      <h1>Makanan Berat Serta <em>Brownies</em> yang bikin ketagihan</h1>
+      <h1>chicken curry katsu serta <em>Brownies</em> yang bikin ketagihan</h1>
       <p class="hero-sub">Daily Crave menghadirkan makanan berat dan Brownies berkualitas dengan cita rasa terbaik. Dibuat dengan bahan pilihan agar setiap gigitan menjadi pengalaman yang berkesan.
 
 </p>
@@ -235,13 +248,21 @@
       <div class="cart-total"><span class="t-lbl">Total</span><span class="t-val" id="cartTotal">Rp 0</span></div>
       <button class="btn btn-wa" id="checkoutBtn" onclick="checkout()">
         <svg viewBox="0 0 24 24" fill="none"><path d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.5-1.2A9 9 0 1 0 12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 9c0 4 2 6 6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-        Pesan via WhatsApp
+        Klik Pesan Via WhatsApp
       </button>
     </div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="order-success" id="orderSuccess">
+  <div class="os-card">
+    <div class="os-check"><svg viewBox="0 0 52 52"><circle class="c1" cx="26" cy="26" r="24"/><path class="c2" d="M15 27l7 7 15-15"/></svg></div>
+    <h3>Pesanan Terkirim!</h3>
+    <p>Terima kasih 🍫 Lanjutkan di WhatsApp untuk konfirmasi pesananmu.</p>
+  </div>
+</div>
 
 <script>
   // ====== GANTI dengan nomor WhatsApp toko (format: 62 tanpa 0 di depan) ======
@@ -363,11 +384,18 @@
     msg += `%0ATotal: ${rupiah(cartTotal())}%0A%0ATerima kasih!`;
     window.open(`https://wa.me/${WA_NUMBER}?text=${msg}`, '_blank');
 
-    // 3) kosongkan keranjang & beri konfirmasi
+    // 3) kosongkan keranjang & tampilkan animasi sukses
     ids.forEach(id => delete cart[id]);
     document.getElementById('custName').value = '';
     renderCart(); closeCart();
-    toast('Pesanan terkirim! Terima kasih 🍫');
+    showOrderSuccess();
+  }
+
+  function showOrderSuccess(){
+    const ov = document.getElementById('orderSuccess');
+    ov.querySelectorAll('.c1,.c2').forEach(el => { el.style.animation='none'; void el.offsetWidth; el.style.animation=''; });
+    ov.classList.add('show');
+    setTimeout(() => ov.classList.remove('show'), 2800);
   }
 
   // ====== TOAST ======
