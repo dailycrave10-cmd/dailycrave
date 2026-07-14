@@ -136,6 +136,7 @@
   }
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -248,11 +249,24 @@
     {id:3, name:'Brownies Keju', price:45000, desc:'Topping keju melimpah di atas brownies cokelat.', img:IMGS.IMG3, category:'Makanan Ringan', best:false, available:false},
     {id:4, name:'Brownies Kacang', price:47000, desc:'Renyah kacang almond memenuhi tiap potongan.', img:IMGS.IMG4, category:'Makanan Ringan', best:true, available:true},
   ];
-  // ambil menu & kategori dari admin (localStorage) bila ada
-  function loadMenus(){ try{ const m=JSON.parse(localStorage.getItem('dc_menus')); if(Array.isArray(m)&&m.length) return m; }catch(e){} return DEFAULT_MENUS; }
-  function loadCategories(){ try{ const c=JSON.parse(localStorage.getItem('dc_categories')); if(Array.isArray(c)&&c.length) return c; }catch(e){} return ['Makanan Berat','Makanan Ringan','Minuman']; }
-  let menus = loadMenus();
-  let categories = loadCategories();
+  // menu contoh (hanya dipakai admin untuk mengisi database pertama kali)
+  // ====== DATABASE ONLINE (Supabase) ======
+  const SUPABASE_URL = 'https://hsopgtaxjoanigcepyhn.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_Jvc_IbB7BW51prYcz6ezcQ_rm1tH5XA';
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let menus = [];
+  let categories = ['Makanan Berat','Makanan Ringan','Minuman'];
+  async function loadMenus(){
+    try{
+      const { data } = await db.from('menus').select('*').order('id', { ascending:true });
+      if(Array.isArray(data)){
+        menus = data;
+        const cats = [...new Set(data.map(m=>m.category).filter(Boolean))];
+        if(cats.length) categories = cats;
+      }
+    }catch(e){ console.error('Gagal memuat menu:', e); }
+    renderFilter(); renderMenu();
+  }
   let activeFilter = 'Semua';
   const cart = {}; // id -> qty
 
@@ -324,13 +338,10 @@
   function closeCart(){ document.getElementById('cartOverlay').classList.remove('show'); }
   document.getElementById('cartOverlay').addEventListener('click', e => { if(e.target.id === 'cartOverlay') closeCart(); });
 
-  function saveOrderToAdmin(name){
-    let orders = [];
-    try{ const o = JSON.parse(localStorage.getItem('dc_orders')); if(Array.isArray(o)) orders = o; }catch(e){}
+  async function saveOrderToAdmin(name){
     const items = Object.keys(cart).map(id => { const m = menus.find(x=>x.id==id); return cart[id]+'x '+m.name; }).join(', ');
-    const nextId = orders.length ? Math.max(...orders.map(o=>o.id||1000)) + 1 : 1044;
-    orders.push({ id: nextId, cust: name, item: items, total: cartTotal(), status: 'Baru', date: new Date().toISOString() });
-    try{ localStorage.setItem('dc_orders', JSON.stringify(orders)); }catch(e){}
+    try{ await db.from('orders').insert({ cust: name, item: items, total: cartTotal(), status: 'Baru' }); }
+    catch(e){ console.error('Gagal mengirim pesanan:', e); }
   }
 
   function checkout(){
@@ -338,7 +349,7 @@
     if(!ids.length) return;
     const name = (document.getElementById('custName').value || '').trim() || 'Pelanggan Web';
 
-    // 1) simpan pesanan supaya masuk ke panel admin (riwayat order)
+    // 1) simpan pesanan supaya masuk ke panel admin (riwayat order di Supabase)
     saveOrderToAdmin(name);
 
     // 2) buka WhatsApp dengan rincian pesanan
@@ -384,14 +395,14 @@
   })();
 
   // jika admin mengubah menu di tab lain, perbarui otomatis
-  window.addEventListener('storage', e => {
-    if(e.key === 'dc_menus' || e.key === 'dc_categories'){
-      menus = loadMenus(); categories = loadCategories();
-      renderFilter(); renderMenu(); renderCart();
-    }
-  });
+  // jika admin mengubah menu, halaman pelanggan ikut ter-update otomatis (realtime)
+  db.channel('dc-menus-public')
+    .on('postgres_changes', { event:'*', schema:'public', table:'menus' }, () => { loadMenus(); })
+    .subscribe();
 
-  renderFilter(); renderMenu(); renderCart();
+  // muat menu dari database saat halaman dibuka
+  loadMenus();
+  renderCart();
 </script>
 </body>
 </html>
