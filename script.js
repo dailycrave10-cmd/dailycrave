@@ -192,7 +192,6 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     document.getElementById('statMenu').textContent = menus.length;
     document.getElementById('menuCount').textContent = list.length + ' menu';
     updateStats();
-    saveDB();
   }
 
   // isi angka statistik dari data asli (login & dashboard)
@@ -204,7 +203,7 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
   }
 
   // ubah status stok langsung dari kartu
-  function toggleStock(id){ const m=menus.find(x=>x.id===id); if(!m) return; m.available=!m.available; renderMenu(); toast(m.available?'"'+m.name+'" ditandai Tersedia':'"'+m.name+'" ditandai Kosong'); }
+  function toggleStock(id){ const m=menus.find(x=>x.id===id); if(!m) return; m.available=!m.available; renderMenu(); saveMenus(); toast(m.available?'"'+m.name+'" ditandai Tersedia':'"'+m.name+'" ditandai Kosong'); }
 
   // ganti foto
   const photoInput = document.getElementById('photoInput');
@@ -247,7 +246,7 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
   const mBest = document.getElementById('mBest');
   document.getElementById('addBtn').onclick = () => { editingId=null; modalTitle.textContent='Tambah Menu'; mName.value=''; mPrice.value=''; mDesc.value=''; modalPhoto=null; setThumb(null,'Ketuk untuk unggah dari perangkat'); mAvailable.checked=true; mBest.checked=false; renderCategoryOptions(); mCategory.value = (activeFilter!=='Semua' ? activeFilter : (categories[0]||'')); openModal(); };
   function editMenu(id){ const m=menus.find(x=>x.id===id); if(!m) return; editingId=id; modalTitle.textContent='Edit Menu'; mName.value=m.name; mPrice.value=m.price; mDesc.value=m.desc; modalPhoto=null; setThumb(m.img,'Foto saat ini — Klik Jika Ingin ganti'); mAvailable.checked=m.available; mBest.checked=m.best; renderCategoryOptions(); mCategory.value = m.category || (categories[0]||''); openModal(); }
-  function deleteMenu(id){ const m=menus.find(x=>x.id===id); if(!m) return; askConfirm('Hapus menu "'+m.name+'"?', ()=>{ menus=menus.filter(x=>x.id!==id); renderMenu(); toast('Menu dihapus'); }); }
+  function deleteMenu(id){ const m=menus.find(x=>x.id===id); if(!m) return; askConfirm('Hapus menu "'+m.name+'"?', ()=>{ menus=menus.filter(x=>x.id!==id); renderMenu(); deleteMenuDB(id); toast('Menu dihapus'); }); }
   document.getElementById('cancelBtn').onclick = closeModal;
   overlay.addEventListener('click', e => { if(e.target===overlay) closeModal(); });
   document.getElementById('saveBtn').onclick = () => {
@@ -255,7 +254,7 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     if(!name||!price){ toast('Nama dan harga wajib diisi'); return; }
     if(editingId){ const m=menus.find(x=>x.id===editingId); m.name=name; m.price=+price; m.desc=desc||m.desc; if(modalPhoto) m.img=modalPhoto; m.available=mAvailable.checked; m.best=mBest.checked; m.category=mCategory.value; toast('Menu diperbarui'); }
     else { menus.push({id:nextId++, name, price:+price, desc:desc||'Brownies spesial buatan Daily Crave.', img:modalPhoto||IMGS.IMG1, available:mAvailable.checked, best:mBest.checked, category:mCategory.value}); toast('Menu ditambahkan'); }
-    closeModal(); renderMenu();
+    closeModal(); renderMenu(); saveMenus();
   };
 
   // ============ DATA PESANAN (contoh, di memori) ============
@@ -349,10 +348,9 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     document.getElementById('navPesananCount').textContent = active;
     if (typeof renderReport === 'function') renderReport();
     if (typeof updateStats === 'function') updateStats();
-    saveDB();
   }
-  function advanceOrder(id){ const o=orders.find(x=>x.id===id); if(o&&NEXT[o.status]){ o.status=NEXT[o.status]; renderOrders(); toast('Pesanan #'+id+' → '+o.status); } }
-  function deleteOrder(id){ askConfirm('Hapus pesanan #'+id+'?', ()=>{ orders=orders.filter(x=>x.id!==id); renderOrders(); toast('Pesanan dihapus'); }); }
+  function advanceOrder(id){ const o=orders.find(x=>x.id===id); if(o&&NEXT[o.status]){ o.status=NEXT[o.status]; renderOrders(); saveOrderStatus(o); toast('Pesanan #'+id+' → '+o.status); } }
+  function deleteOrder(id){ askConfirm('Hapus pesanan #'+id+'?', ()=>{ orders=orders.filter(x=>x.id!==id); renderOrders(); deleteOrderDB(id); toast('Pesanan dihapus'); }); }
 
   // ============ KONFIRMASI HAPUS (buatan sendiri) ============
   const confirmOverlay = document.getElementById('confirmOverlay');
@@ -418,42 +416,42 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
   }
 
   ['dashDate','reportDate'].forEach(id => { const el=document.getElementById(id); if(el) el.addEventListener('change', e => onPickDate(e.target.value)); });
-  // ============ PENYIMPANAN BERSAMA (localStorage) ============
-  // Menu & pesanan disimpan di sini agar terhubung dengan halaman pelanggan (index.html)
-  const DB_MENUS='dc_menus', DB_ORDERS='dc_orders', DB_CATS='dc_categories';
+  // ============ DATABASE ONLINE (Supabase) ============
+  const SUPABASE_URL = 'https://hsopgtaxjoanigcepyhn.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_Jvc_IbB7BW51prYcz6ezcQ_rm1tH5XA';
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   let applyingRemote = false;
-  function saveDB(){
-    if(applyingRemote) return;
+
+  const menuRow = m => ({ id:m.id, name:m.name, price:m.price, desc:m.desc, img:m.img, category:m.category, best:!!m.best, available:!!m.available });
+  async function saveMenus(){ try{ await db.from('menus').upsert(menus.map(menuRow)); }catch(e){ console.error(e); } }
+  async function deleteMenuDB(id){ try{ await db.from('menus').delete().eq('id', id); }catch(e){ console.error(e); } }
+  async function saveOrderStatus(o){ try{ await db.from('orders').update({ status:o.status }).eq('id', o.id); }catch(e){ console.error(e); } }
+  async function deleteOrderDB(id){ try{ await db.from('orders').delete().eq('id', id); }catch(e){ console.error(e); } }
+
+  async function loadDB(){
     try{
-      localStorage.setItem(DB_MENUS, JSON.stringify(menus));
-      localStorage.setItem(DB_ORDERS, JSON.stringify(orders));
-      localStorage.setItem(DB_CATS, JSON.stringify(categories));
-    }catch(e){}
-  }
-  function loadDB(){
-    try{
-      const m = JSON.parse(localStorage.getItem(DB_MENUS));
-      if(Array.isArray(m) && m.length){ menus = m; nextId = Math.max(0, ...menus.map(x=>x.id||0)) + 1; }
-      const c = JSON.parse(localStorage.getItem(DB_CATS));
-      if(Array.isArray(c) && c.length) categories = c;
-      const o = JSON.parse(localStorage.getItem(DB_ORDERS));
-      if(Array.isArray(o)) orders = o.map(x => ({ ...x, date: x.date ? new Date(x.date) : new Date() }));
-    }catch(e){}
+      const { data: mData } = await db.from('menus').select('*').order('id', { ascending:true });
+      if(Array.isArray(mData)){
+        if(mData.length){ menus = mData; nextId = Math.max(0, ...menus.map(x=>x.id||0)) + 1; }
+        else { await saveMenus(); } // pertama kali: isi menu contoh ke database
+      }
+      const { data: oData } = await db.from('orders').select('*').order('created_at', { ascending:false });
+      if(Array.isArray(oData)){
+        orders = oData.map(x => ({ id:x.id, cust:x.cust, item:x.item, total:x.total, status:x.status, date: x.created_at ? new Date(x.created_at) : new Date() }));
+      }
+    }catch(e){ console.error('Gagal memuat data:', e); }
   }
   function renderAll(){ renderPeriodBars(); renderFilter(); renderMenu(); renderOrders(); renderReport(); }
 
-  // bila pelanggan memesan / data berubah di tab lain, perbarui otomatis
-  window.addEventListener('storage', e => {
-    if([DB_MENUS, DB_ORDERS, DB_CATS].includes(e.key)){
-      applyingRemote = true;
-      loadDB();
-      renderAll();
-      applyingRemote = false;
-    }
-  });
+  // dengarkan perubahan realtime (mis. pesanan baru dari pelanggan)
+  function subscribeRealtime(){
+    db.channel('dc-changes')
+      .on('postgres_changes', { event:'*', schema:'public', table:'orders' }, async () => { applyingRemote=true; await loadDB(); renderAll(); applyingRemote=false; })
+      .on('postgres_changes', { event:'*', schema:'public', table:'menus' },  async () => { applyingRemote=true; await loadDB(); renderAll(); applyingRemote=false; })
+      .subscribe();
+  }
 
-  loadDB();
-  renderPeriodBars(); renderFilter(); renderMenu(); renderOrders(); renderReport();
+  (async function init(){ await loadDB(); renderAll(); subscribeRealtime(); })();
 
   // ===== SLIDESHOW PANEL LOGIN (geser kanan ke kiri, otomatis) =====
   (function(){
