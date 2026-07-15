@@ -107,17 +107,56 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     if (u !== 'chandy'){ userInput.classList.add('invalid'); showError('Nama pengguna tidak ditemukan.'); return; }
     if (!(await verifyPassword(p))){ pass.classList.add('invalid'); showError('Kata sandi salah.'); return; }
 
-    // ===== berhasil masuk =====
+    // ===== kata sandi benar → minta PIN keamanan =====
     errBox.classList.remove('show'); clearInvalid();
-    showAccount(u);
-    showSuccessScreen(u, () => {
-      document.getElementById('loginScreen').style.display = 'none';
-      const adminApp = document.getElementById('adminApp');
-      adminApp.style.display = 'block';
-      adminApp.classList.remove('fade-in'); void adminApp.offsetWidth; adminApp.classList.add('fade-in');
-      window.scrollTo(0,0);
+    askPin(() => {
+      showAccount(u);
+      showSuccessScreen(u, () => {
+        document.getElementById('loginScreen').style.display = 'none';
+        const adminApp = document.getElementById('adminApp');
+        adminApp.style.display = 'block';
+        adminApp.classList.remove('fade-in'); void adminApp.offsetWidth; adminApp.classList.add('fade-in');
+        window.scrollTo(0,0);
+      });
     });
   });
+
+  // ===== PIN KEAMANAN (lapis kedua) =====
+  const PIN_CADANGAN = '123456'; // dipakai bila database PIN belum disiapkan
+  function askPin(onOk){
+    const ov = document.getElementById('pinOverlay');
+    const input = document.getElementById('pinInput');
+    const err = document.getElementById('pinErr');
+    input.value = ''; err.textContent = ''; input.classList.remove('invalid');
+    ov.classList.add('show');
+    setTimeout(() => input.focus(), 100);
+
+    const close = () => { ov.classList.remove('show'); document.getElementById('pinOk').onclick=null; input.onkeydown=null; };
+    document.getElementById('pinCancel').onclick = close;
+    const submit = async () => {
+      const v = input.value.trim();
+      if(!v){ err.textContent = 'PIN wajib diisi.'; input.classList.add('invalid'); return; }
+      const ok = await verifyPin(v);
+      if(!ok){
+        err.textContent = 'PIN salah. Coba lagi.';
+        input.classList.remove('invalid'); void input.offsetWidth; input.classList.add('invalid');
+        input.value = ''; input.focus(); return;
+      }
+      close(); onOk();
+    };
+    document.getElementById('pinOk').onclick = submit;
+    input.onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); submit(); } };
+  }
+  async function verifyPin(v){
+    try{
+      const { data, error } = await db.rpc('verify_admin_pin', { p: v });
+      if(error) throw error;
+      return data === true;
+    }catch(e){
+      console.warn('Cek PIN via database gagal, memakai cadangan:', e.message);
+      return v === PIN_CADANGAN;
+    }
+  }
 
 
 /* =========================================================
@@ -509,8 +548,25 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
       } else { toast('Kata sandi lama salah'); }
     }catch(e){ console.error(e); toast('Gagal mengubah. Pastikan SQL pengaturan sudah dijalankan.'); }
   }
+  async function changePin(){
+    const oldP = document.getElementById('setOldPin').value.trim();
+    const newP = document.getElementById('setNewPin').value.trim();
+    const newP2 = document.getElementById('setNewPin2').value.trim();
+    if(!oldP || !newP){ toast('Isi PIN lama dan baru'); return; }
+    if(!/^\d{4,6}$/.test(newP)){ toast('PIN baru harus 4-6 angka'); return; }
+    if(newP !== newP2){ toast('Ulangi PIN tidak cocok'); return; }
+    try{
+      const { data, error } = await db.rpc('change_admin_pin', { old_p: oldP, new_p: newP });
+      if(error) throw error;
+      if(data === true){
+        toast('PIN berhasil diubah');
+        ['setOldPin','setNewPin','setNewPin2'].forEach(id => document.getElementById(id).value='');
+      } else { toast('PIN lama salah'); }
+    }catch(e){ console.error(e); toast('Gagal mengubah. Pastikan SQL PIN sudah dijalankan.'); }
+  }
   document.getElementById('saveSettingsBtn').onclick = saveSettings;
   document.getElementById('savePassBtn').onclick = changePassword;
+  document.getElementById('savePinBtn').onclick = changePin;
 
   (async function init(){ await loadDB(); renderAll(); subscribeRealtime(); loadSettings(); })();
 
