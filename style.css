@@ -466,3 +466,20 @@
   .set-form input{font-family:inherit;font-size:14px;color:var(--ink);background:var(--cream);border:1.5px solid var(--line);border-radius:11px;padding:11px 14px;width:100%}
   .set-form input:focus{outline:none;border-color:var(--caramel);box-shadow:0 0 0 4px rgba(206,146,87,.15)}
   .set-actions{margin-top:20px}
+
+  /* ===== LAYAR PIN KEAMANAN ===== */
+  .pin-overlay{position:fixed;inset:0;z-index:150;display:none;align-items:center;justify-content:center;background:rgba(42,23,16,.6);backdrop-filter:blur(4px)}
+  .pin-overlay.show{display:flex;animation:pinFade .25s ease}
+  @keyframes pinFade{from{opacity:0}to{opacity:1}}
+  .pin-card{background:var(--white);border-radius:20px;padding:32px 30px;width:88%;max-width:360px;text-align:center;box-shadow:0 30px 60px -20px rgba(0,0,0,.5);animation:pinPop .35s cubic-bezier(.2,.8,.2,1)}
+  @keyframes pinPop{from{opacity:0;transform:scale(.9) translateY(10px)}to{opacity:1;transform:none}}
+  .pin-ico{width:56px;height:56px;margin:0 auto 14px;border-radius:50%;background:var(--cream-2);display:grid;place-items:center;color:var(--choc-milk)}
+  .pin-ico svg{width:28px;height:28px}
+  .pin-card h3{font-family:'Fraunces',serif;font-size:21px;color:var(--choc);margin-bottom:6px}
+  .pin-card p{font-size:13.5px;color:var(--muted);margin-bottom:18px}
+  #pinInput{width:100%;font-family:inherit;font-size:22px;letter-spacing:.5em;text-align:center;color:var(--ink);background:var(--cream);border:1.5px solid var(--line);border-radius:12px;padding:13px 14px}
+  #pinInput:focus{outline:none;border-color:var(--caramel);box-shadow:0 0 0 4px rgba(206,146,87,.15)}
+  #pinInput.invalid{border-color:var(--danger);box-shadow:0 0 0 4px rgba(181,70,47,.16);animation:inputShake .4s}
+  .pin-err{min-height:18px;font-size:13px;color:var(--danger);font-weight:500;margin-top:9px}
+  .pin-actions{display:flex;gap:10px;margin-top:14px}
+  .pin-actions .btn{flex:1;justify-content:center}
