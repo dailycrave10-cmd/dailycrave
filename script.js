@@ -156,11 +156,14 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
   }
   async function verifyPin(v){
     try{
-      const { data, error } = await db.rpc('verify_admin_pin', { p: v });
-      if(error) throw error;
-      return data === true;
+      const hasil = await Promise.race([
+        db.rpc('verify_admin_pin', { p: v }),
+        new Promise((_, tolak) => setTimeout(() => tolak(new Error('Database tidak menjawab (timeout 5 detik)')), 5000))
+      ]);
+      if(hasil.error) throw hasil.error;
+      return hasil.data === true;
     }catch(e){
-      console.warn('Cek PIN via database gagal, memakai cadangan:', e.message);
+      console.warn('Cek PIN lewat database gagal → memakai cara cadangan. Sebab:', e.message);
       return v === PIN_CADANGAN;
     }
   }
@@ -514,11 +517,15 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
   const PASS_CADANGAN = 'aabb1122'; // dipakai bila pengaturan di database belum disiapkan
   async function verifyPassword(p){
     try{
-      const { data, error } = await db.rpc('verify_admin_password', { p });
-      if(error) throw error;
-      return data === true;
+      const hasil = await Promise.race([
+        db.rpc('verify_admin_password', { p }),
+        new Promise((_, tolak) => setTimeout(() => tolak(new Error('Database tidak menjawab (timeout 5 detik)')), 5000))
+      ]);
+      if(hasil.error) throw hasil.error;
+      console.log('Kata sandi diperiksa lewat database.');
+      return hasil.data === true;
     }catch(e){
-      console.warn('Cek kata sandi via database gagal, memakai cadangan:', e.message);
+      console.warn('Cek kata sandi lewat database gagal → memakai cara cadangan. Sebab:', e.message);
       return p === PASS_CADANGAN;
     }
   }
