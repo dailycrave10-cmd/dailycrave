@@ -127,24 +127,27 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     const ov = document.getElementById('pinOverlay');
     const input = document.getElementById('pinInput');
     const err = document.getElementById('pinErr');
-    input.value = ''; err.textContent = ''; input.classList.remove('invalid');
+    if(!ov || !input){ console.warn('Layar PIN tidak ditemukan — login dilanjutkan tanpa PIN.'); onOk(); return; }
+    input.value = ''; if(err) err.textContent = ''; input.classList.remove('invalid');
     ov.classList.add('show');
     setTimeout(() => input.focus(), 100);
 
-    const close = () => { ov.classList.remove('show'); document.getElementById('pinOk').onclick=null; input.onkeydown=null; };
-    document.getElementById('pinCancel').onclick = close;
+    const okBtn = document.getElementById('pinOk');
+    const cancelBtn = document.getElementById('pinCancel');
+    const close = () => { ov.classList.remove('show'); if(okBtn) okBtn.onclick=null; input.onkeydown=null; };
+    if(cancelBtn) cancelBtn.onclick = close;
     const submit = async () => {
       const v = input.value.trim();
-      if(!v){ err.textContent = 'PIN wajib diisi.'; input.classList.add('invalid'); return; }
+      if(!v){ if(err) err.textContent = 'PIN wajib diisi.'; input.classList.add('invalid'); return; }
       const ok = await verifyPin(v);
       if(!ok){
-        err.textContent = 'PIN salah. Coba lagi.';
+        if(err) err.textContent = 'PIN salah. Coba lagi.';
         input.classList.remove('invalid'); void input.offsetWidth; input.classList.add('invalid');
         input.value = ''; input.focus(); return;
       }
       close(); onOk();
     };
-    document.getElementById('pinOk').onclick = submit;
+    if(okBtn) okBtn.onclick = submit;
     input.onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); submit(); } };
   }
   async function verifyPin(v){
@@ -465,7 +468,12 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
   // ============ DATABASE ONLINE (Supabase) ============
   const SUPABASE_URL = 'https://hsopgtaxjoanigcepyhn.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_Jvc_IbB7BW51prYcz6ezcQ_rm1tH5XA';
-  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let db = null;
+  try{
+    db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }catch(e){
+    console.error('Pustaka Supabase gagal dimuat. Pastikan admin.html memuat supabase-js.', e);
+  }
   let applyingRemote = false;
 
   const menuRow = m => ({ id:m.id, name:m.name, price:m.price, desc:m.desc, img:m.img, category:m.category, best:!!m.best, available:!!m.available });
@@ -491,6 +499,7 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
 
   // dengarkan perubahan realtime (mis. pesanan baru dari pelanggan)
   function subscribeRealtime(){
+    if(!db) return;
     db.channel('dc-changes')
       .on('postgres_changes', { event:'*', schema:'public', table:'orders' }, async () => { applyingRemote=true; await loadDB(); renderAll(); applyingRemote=false; })
       .on('postgres_changes', { event:'*', schema:'public', table:'menus' },  async () => { applyingRemote=true; await loadDB(); renderAll(); applyingRemote=false; })
@@ -564,9 +573,10 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
       } else { toast('PIN lama salah'); }
     }catch(e){ console.error(e); toast('Gagal mengubah. Pastikan SQL PIN sudah dijalankan.'); }
   }
-  document.getElementById('saveSettingsBtn').onclick = saveSettings;
-  document.getElementById('savePassBtn').onclick = changePassword;
-  document.getElementById('savePinBtn').onclick = changePin;
+  const pasangTombol = (id, fn) => { const el = document.getElementById(id); if(el) el.onclick = fn; };
+  pasangTombol('saveSettingsBtn', saveSettings);
+  pasangTombol('savePassBtn', changePassword);
+  pasangTombol('savePinBtn', changePin);
 
   (async function init(){ await loadDB(); renderAll(); subscribeRealtime(); loadSettings(); })();
 
