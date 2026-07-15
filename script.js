@@ -95,7 +95,7 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     }, SUCCESS_MS);
   }
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const u = userInput.value.trim();
     const p = pass.value.trim();
@@ -105,7 +105,7 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     if (!u){ userInput.classList.add('invalid'); showError('Nama pengguna wajib diisi.'); return; }
     if (!p){ pass.classList.add('invalid'); showError('Kata sandi wajib diisi.'); return; }
     if (u !== 'chandy'){ userInput.classList.add('invalid'); showError('Nama pengguna tidak ditemukan.'); return; }
-    if (p !== 'aabb1122'){ pass.classList.add('invalid'); showError('Kata sandi salah.'); return; }
+    if (!(await verifyPassword(p))){ pass.classList.add('invalid'); showError('Kata sandi salah.'); return; }
 
     // ===== berhasil masuk =====
     errBox.classList.remove('show'); clearInvalid();
@@ -458,7 +458,61 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
       .subscribe();
   }
 
-  (async function init(){ await loadDB(); renderAll(); subscribeRealtime(); })();
+  // ============ PENGATURAN TOKO ============
+  const PASS_CADANGAN = 'aabb1122'; // dipakai bila pengaturan di database belum disiapkan
+  async function verifyPassword(p){
+    try{
+      const { data, error } = await db.rpc('verify_admin_password', { p });
+      if(error) throw error;
+      return data === true;
+    }catch(e){
+      console.warn('Cek kata sandi via database gagal, memakai cadangan:', e.message);
+      return p === PASS_CADANGAN;
+    }
+  }
+  async function loadSettings(){
+    try{
+      const { data } = await db.from('settings').select('*');
+      if(!Array.isArray(data)) return;
+      const get = k => (data.find(x=>x.key===k)||{}).value || '';
+      const set = (id,v) => { const el=document.getElementById(id); if(el) el.value=v; };
+      set('setWa', get('wa_number')); set('setIg', get('instagram'));
+      set('setTiktok', get('tiktok')); set('setFb', get('facebook'));
+    }catch(e){ console.error('Gagal memuat pengaturan:', e); }
+  }
+  async function saveSettings(){
+    const rows = [
+      { key:'wa_number', value:(document.getElementById('setWa').value||'').trim() },
+      { key:'instagram', value:(document.getElementById('setIg').value||'').trim() },
+      { key:'tiktok',    value:(document.getElementById('setTiktok').value||'').trim() },
+      { key:'facebook',  value:(document.getElementById('setFb').value||'').trim() },
+    ];
+    try{
+      const { error } = await db.from('settings').upsert(rows, { onConflict:'key' });
+      if(error) throw error;
+      toast('Pengaturan tersimpan — halaman pelanggan ikut berubah');
+    }catch(e){ console.error(e); toast('Gagal menyimpan. Pastikan SQL pengaturan sudah dijalankan.'); }
+  }
+  async function changePassword(){
+    const oldP = document.getElementById('setOldPass').value.trim();
+    const newP = document.getElementById('setNewPass').value.trim();
+    const newP2 = document.getElementById('setNewPass2').value.trim();
+    if(!oldP || !newP){ toast('Isi kata sandi lama dan baru'); return; }
+    if(newP.length < 6){ toast('Kata sandi baru minimal 6 karakter'); return; }
+    if(newP !== newP2){ toast('Ulangi kata sandi tidak cocok'); return; }
+    try{
+      const { data, error } = await db.rpc('change_admin_password', { old_p: oldP, new_p: newP });
+      if(error) throw error;
+      if(data === true){
+        toast('Kata sandi berhasil diubah');
+        ['setOldPass','setNewPass','setNewPass2'].forEach(id => document.getElementById(id).value='');
+      } else { toast('Kata sandi lama salah'); }
+    }catch(e){ console.error(e); toast('Gagal mengubah. Pastikan SQL pengaturan sudah dijalankan.'); }
+  }
+  document.getElementById('saveSettingsBtn').onclick = saveSettings;
+  document.getElementById('savePassBtn').onclick = changePassword;
+
+  (async function init(){ await loadDB(); renderAll(); subscribeRealtime(); loadSettings(); })();
 
   // ===== SLIDESHOW PANEL LOGIN (geser kanan ke kiri, otomatis) =====
   (function(){
