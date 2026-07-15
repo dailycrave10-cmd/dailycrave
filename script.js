@@ -13,11 +13,11 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
   const pass = document.getElementById('password');
   const toggle = document.getElementById('togglePass');
   const eye = document.getElementById('eyeIcon');
-  toggle.addEventListener('click', () => {
+  if (toggle && pass) toggle.addEventListener('click', () => {
     const show = pass.type === 'password';
     pass.type = show ? 'text' : 'password';
     toggle.setAttribute('aria-label', show ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi');
-    eye.innerHTML = show
+    if (eye) eye.innerHTML = show
       ? '<path d="M4 4l16 16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M9.5 5.7A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.8 3.5M6.2 7.4A17 17 0 0 0 2.5 12S6 18.5 12 18.5a9.4 9.4 0 0 0 3-.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" stroke="currentColor" stroke-width="1.6"/>'
       : '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/>';
   });
@@ -28,20 +28,21 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
   const loginCard = document.querySelector('#loginScreen .card');
 
   const userInput = document.getElementById('username');
-  function clearInvalid(){ userInput.classList.remove('invalid'); pass.classList.remove('invalid'); }
+  function clearInvalid(){ if(userInput) userInput.classList.remove('invalid'); if(pass) pass.classList.remove('invalid'); }
   function showError(msg){
-    errText.textContent = msg;
-    errBox.classList.remove('show'); void errBox.offsetWidth; errBox.classList.add('show');
-    loginCard.classList.remove('shake'); void loginCard.offsetWidth; loginCard.classList.add('shake');
+    if(errText) errText.textContent = msg;
+    if(errBox){ errBox.classList.remove('show'); void errBox.offsetWidth; errBox.classList.add('show'); }
+    if(loginCard){ loginCard.classList.remove('shake'); void loginCard.offsetWidth; loginCard.classList.add('shake'); }
   }
-  userInput.addEventListener('input', clearInvalid);
-  pass.addEventListener('input', clearInvalid);
+  if (userInput) userInput.addEventListener('input', clearInvalid);
+  if (pass) pass.addEventListener('input', clearInvalid);
 
   // ===== Profil mengikuti username yang diketik saat login =====
   function showAccount(username){
-    document.getElementById('accName').textContent = username;
-    document.getElementById('accEmail').textContent = username + '@gmail.com';
-    document.getElementById('accAvatar').textContent = (username[0] || 'A').toUpperCase();
+    const set = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+    set('accName', username);
+    set('accEmail', username + '@gmail.com');
+    set('accAvatar', (username[0] || 'A').toUpperCase());
   }
 
   // ===== LAYAR SUKSES LOGIN (mandiri, dibuat oleh JS) =====
@@ -95,8 +96,10 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     }, SUCCESS_MS);
   }
 
-  form.addEventListener('submit', async (e) => {
+  if (!form) console.error('PENTING: elemen loginForm tidak ditemukan di admin.html — tombol Masuk tidak akan berfungsi.');
+  if (form) form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    console.log('Tombol Masuk ditekan — memeriksa kata sandi…');
     const u = userInput.value.trim();
     const p = pass.value.trim();
     clearInvalid();
@@ -108,7 +111,8 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     if (!(await verifyPassword(p))){ pass.classList.add('invalid'); showError('Kata sandi salah.'); return; }
 
     // ===== kata sandi benar → minta PIN keamanan =====
-    errBox.classList.remove('show'); clearInvalid();
+    if (errBox) errBox.classList.remove('show');
+    clearInvalid();
     askPin(() => {
       showAccount(u);
       showSuccessScreen(u, () => {
