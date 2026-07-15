@@ -457,9 +457,24 @@
     else { btn.style.display=''; wait.style.display='none'; btn.disabled=!Object.keys(cart).length; }
   }
 
+  // simpan pesanan; kalau kolom alamat/note belum ada di database, gabungkan ke teks pesanan
+  async function insertOrder(payload){
+    let res = await db.from('orders').insert(payload).select().single();
+    if(res.error){
+      console.warn('Insert lengkap gagal, mencoba cara cadangan:', res.error.message);
+      const { alamat, note, ...basic } = payload;
+      const extra = [];
+      if(alamat) extra.push('Alamat: ' + alamat);
+      if(note) extra.push('Catatan: ' + note);
+      if(extra.length) basic.item = basic.item + ' — ' + extra.join(' | ');
+      res = await db.from('orders').insert(basic).select().single();
+    }
+    return res;
+  }
+
   async function submitOrder(name, items, total, addr, note){
     try{
-      const { data, error } = await db.from('orders').insert({ cust:name, item:items, total:total, status:'Baru', alamat:addr, note:note }).select().single();
+      const { data, error } = await insertOrder({ cust:name, item:items, total:total, status:'Baru', alamat:addr, note:note });
       if(error) throw error;
       addMyOrder({ id:data.id, name, items, total, addr, note, date:new Date().toISOString(), status:'Baru' });
       pendingOrderId = data.id; updateOrderButtonState();
