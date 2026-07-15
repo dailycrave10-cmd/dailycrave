@@ -457,3 +457,12 @@
     .o-actions{justify-content:flex-start;margin-top:8px}
   }
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+  /* ===== HALAMAN PENGATURAN ===== */
+  .set-form{display:flex;flex-direction:column;gap:0;max-width:520px}
+  .set-form label{font-size:13px;font-weight:600;color:var(--choc);margin:14px 0 6px}
+  .set-form label:first-child{margin-top:0}
+  .set-form .hint{font-weight:400;color:var(--muted);font-size:11.5px}
+  .set-form input{font-family:inherit;font-size:14px;color:var(--ink);background:var(--cream);border:1.5px solid var(--line);border-radius:11px;padding:11px 14px;width:100%}
+  .set-form input:focus{outline:none;border-color:var(--caramel);box-shadow:0 0 0 4px rgba(206,146,87,.15)}
+  .set-actions{margin-top:20px}
