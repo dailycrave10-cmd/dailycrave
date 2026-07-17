@@ -483,26 +483,24 @@
     else { btn.style.display=''; wait.style.display='none'; btn.disabled=!Object.keys(cart).length; }
   }
 
-  // simpan pesanan; kalau kolom alamat/note belum ada di database, gabungkan ke teks pesanan
+  // Tamu TIDAK punya akses ke tabel orders. Memesan lewat fungsi server,
+  // yang cuma mengembalikan id + token milik pesanan ini saja.
   async function insertOrder(payload){
-    let res = await db.from('orders').insert(payload).select().single();
-    if(res.error){
-      console.warn('Insert lengkap gagal, mencoba cara cadangan:', res.error.message);
-      const { alamat, note, ...basic } = payload;
-      const extra = [];
-      if(alamat) extra.push('Alamat: ' + alamat);
-      if(note) extra.push('Catatan: ' + note);
-      if(extra.length) basic.item = basic.item + ' — ' + extra.join(' | ');
-      res = await db.from('orders').insert(basic).select().single();
-    }
-    return res;
+    const { data, error } = await db.rpc('create_order', {
+      p_cust:   payload.cust,
+      p_item:   payload.item,
+      p_total:  payload.total,
+      p_alamat: payload.alamat || null,
+      p_note:   payload.note   || null
+    });
+    return { data, error };
   }
 
   async function submitOrder(name, items, total, addr, note){
     try{
       const { data, error } = await insertOrder({ cust:name, item:items, total:total, status:'Baru', alamat:addr, note:note });
       if(error) throw error;
-      addMyOrder({ id:data.id, name, items, total, addr, note, date:new Date().toISOString(), status:'Baru' });
+      addMyOrder({ id:data.id, token:data.token, name, items, total, addr, note, date:new Date().toISOString(), status:'Baru' });
       pendingOrderId = data.id; updateOrderButtonState();
     }catch(e){
       console.error('Gagal mengirim pesanan:', e);
@@ -576,11 +574,29 @@
   })();
 
   // realtime: menu & status pesanan
+  // Realtime hanya untuk menu. Status pesanan TIDAK lagi lewat realtime:
+  // realtime mengikuti izin SELECT, dan tamu sudah tidak boleh membaca tabel
+  // orders sama sekali. Kalau dibiarkan, seluruh pesanan ikut terkirim ke
+  // setiap pengunjung — itu justru kebocoran yang sedang kita tutup.
   db.channel('dc-public')
     .on('postgres_changes', { event:'*', schema:'public', table:'menus' }, () => { loadMenus(); })
-    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'orders' }, payload => { if(payload.new) updateMyOrderStatus(payload.new.id, payload.new.status); })
-    .on('postgres_changes', { event:'DELETE', schema:'public', table:'orders' }, payload => { if(payload.old && payload.old.id===pendingOrderId){ updateMyOrderStatus(payload.old.id, 'Selesai'); } })
     .subscribe();
+
+  // Ganti: tanya berkala, hanya untuk pesanan milik sendiri, pakai token.
+  const POLL_MS = 8000;
+  async function pollStatusPesanan(){
+    if(!pendingOrderId || pendingOrderId === -1) return;
+    const o = getMyOrders().find(x => x.id === pendingOrderId);
+    if(!o || !o.token) return;
+    try{
+      const { data, error } = await db.rpc('get_order_status', { p_id: o.id, p_token: o.token });
+      if(error) return;
+      if(data === null || data === undefined) updateMyOrderStatus(o.id, 'Selesai');
+      else if(data !== o.status) updateMyOrderStatus(o.id, data);
+    }catch(e){ /* diam; coba lagi siklus berikutnya */ }
+  }
+  setInterval(pollStatusPesanan, POLL_MS);
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) pollStatusPesanan(); });
 
   // cek pesanan yang masih menunggu dari kunjungan sebelumnya
   async function checkPendingOnLoad(){
@@ -588,9 +604,10 @@
     if(!pending){ updateOrderButtonState(); return; }
     pendingOrderId = pending.id; updateOrderButtonState();
     try{
-      const { data } = await db.from('orders').select('status').eq('id', pending.id).single();
-      if(!data) updateMyOrderStatus(pending.id, 'Selesai');
-      else if(data.status !== 'Baru') updateMyOrderStatus(pending.id, data.status);
+      if(!pending.token){ updateMyOrderStatus(pending.id, 'Selesai'); return; }  // pesanan lama, sebelum ada token
+      const { data } = await db.rpc('get_order_status', { p_id: pending.id, p_token: pending.token });
+      if(data === null || data === undefined) updateMyOrderStatus(pending.id, 'Selesai');
+      else if(data !== 'Baru') updateMyOrderStatus(pending.id, data);
     }catch(e){ /* biarkan terkunci sampai realtime memberi kabar */ }
   }
 
