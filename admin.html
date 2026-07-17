@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 
@@ -232,18 +232,6 @@
         </div>
       </div>
 
-      <div class="panel">
-        <div class="panel-head"><h2>Ubah PIN Keamanan</h2></div>
-        <div class="set-form">
-          <label for="setOldPin">PIN lama <span class="hint">PIN awal: 123456</span></label>
-          <input id="setOldPin" type="password" inputmode="numeric" maxlength="6" placeholder="PIN lama">
-          <label for="setNewPin">PIN baru</label>
-          <input id="setNewPin" type="password" inputmode="numeric" maxlength="6" placeholder="4-6 angka">
-          <label for="setNewPin2">Ulangi PIN baru</label>
-          <input id="setNewPin2" type="password" inputmode="numeric" maxlength="6" placeholder="Ulangi PIN baru">
-          <div class="set-actions"><button class="btn btn-primary" id="savePinBtn">Ubah PIN</button></div>
-        </div>
-      </div>
     </section>
 
 <input type="file" id="photoInput" accept="image/*" style="display:none">
@@ -306,23 +294,8 @@
   </div>
 </div>
 
-<div class="pin-overlay" id="pinOverlay">
-  <div class="pin-card">
-    <div class="pin-ico">
-      <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10" stroke="currentColor" stroke-width="1.6"/></svg>
-    </div>
-    <h3>Verifikasi PIN</h3>
-    <p>Masukkan PIN keamanan untuk melanjutkan.</p>
-    <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
-    <div class="pin-err" id="pinErr"></div>
-    <div class="pin-actions">
-      <button class="btn btn-ghost" id="pinCancel">Batal</button>
-      <button class="btn btn-primary" id="pinOk">Verifikasi</button>
-    </div>
-  </div>
-</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="script.js?v=5"></script>
+<script src="script.js?v=7"></script>
 </body>
 </html>
