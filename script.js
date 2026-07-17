@@ -37,13 +37,12 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
   if (userInput) userInput.addEventListener('input', clearInvalid);
   if (pass) pass.addEventListener('input', clearInvalid);
 
-  // ===== Profil diisi dari akun Supabase Auth yang sedang login =====
-  function showAccount(email){
-    const nama = (email || '').split('@')[0] || 'admin';
+  // ===== Profil mengikuti username yang diketik saat login =====
+  function showAccount(username){
     const set = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
-    set('accName', nama);
-    set('accEmail', email || '');
-    set('accAvatar', (nama[0] || 'A').toUpperCase());
+    set('accName', username);
+    set('accEmail', username + '@gmail.com');
+    set('accAvatar', (username[0] || 'A').toUpperCase());
   }
 
   // ===== LAYAR SUKSES LOGIN (mandiri, dibuat oleh JS) =====
@@ -97,53 +96,33 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     }, SUCCESS_MS);
   }
 
-  // Ketik "chandy" saja boleh; domain di bawah ditempelkan otomatis.
-  // Harus sama persis dengan email user yang Anda buat di Supabase Auth.
-  const EMAIL_DOMAIN = '@dailycrave.app';
-  const toEmail = u => u.includes('@') ? u.toLowerCase() : u.toLowerCase() + EMAIL_DOMAIN;
-
-  function tampilkanDasbor(){
-    document.getElementById('loginScreen').style.display = 'none';
-    const adminApp = document.getElementById('adminApp');
-    adminApp.style.display = 'block';
-    adminApp.classList.remove('fade-in'); void adminApp.offsetWidth; adminApp.classList.add('fade-in');
-    window.scrollTo(0,0);
-  }
-
   if (!form) console.error('PENTING: elemen loginForm tidak ditemukan di admin.html — tombol Masuk tidak akan berfungsi.');
   if (form) form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    console.log('Tombol Masuk ditekan — memeriksa kata sandi…');
     const u = userInput.value.trim();
-    const p = pass.value;
+    const p = pass.value.trim();
     clearInvalid();
 
     if (!u && !p){ userInput.classList.add('invalid'); pass.classList.add('invalid'); showError('Nama pengguna dan kata sandi wajib diisi.'); return; }
     if (!u){ userInput.classList.add('invalid'); showError('Nama pengguna wajib diisi.'); return; }
     if (!p){ pass.classList.add('invalid'); showError('Kata sandi wajib diisi.'); return; }
-    if (!db){ showError('Gagal terhubung ke server. Periksa koneksi internet Anda.'); return; }
+    if (u !== 'chandy'){ userInput.classList.add('invalid'); showError('Nama pengguna tidak ditemukan.'); return; }
+    if (!(await verifyPassword(p))){ pass.classList.add('invalid'); showError('Kata sandi salah.'); return; }
 
-    const btn = form.querySelector('button[type="submit"]');
-    const labelAsli = btn ? btn.textContent : '';
-    if (btn){ btn.disabled = true; btn.textContent = 'Memeriksa\u2026'; }
-
-    // ===== Gerbangnya ada di server Supabase, bukan di file ini =====
-    const { data, error } = await db.auth.signInWithPassword({ email: toEmail(u), password: p });
-
-    if (btn){ btn.disabled = false; btn.textContent = labelAsli; }
-
-    if (error){
-      userInput.classList.add('invalid'); pass.classList.add('invalid');
-      showError(/invalid login/i.test(error.message) ? 'Nama pengguna atau kata sandi salah.' : error.message);
-      return;
-    }
-
+    // ===== kata sandi benar → langsung masuk =====
     if (errBox) errBox.classList.remove('show');
     clearInvalid();
-    pass.value = '';
-    showAccount(data.user.email);
-    showSuccessScreen(data.user.email.split('@')[0], tampilkanDasbor);
-    await muatSemua();
+    showAccount(u);
+    showSuccessScreen(u, () => {
+      document.getElementById('loginScreen').style.display = 'none';
+      const adminApp = document.getElementById('adminApp');
+      adminApp.style.display = 'block';
+      adminApp.classList.remove('fade-in'); void adminApp.offsetWidth; adminApp.classList.add('fade-in');
+      window.scrollTo(0,0);
+    });
   });
+
 
 
 /* =========================================================
@@ -491,6 +470,24 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
   }
 
   // ============ PENGATURAN TOKO ============
+  const PASS_CADANGAN = 'aabb1122'; // dipakai bila pengaturan di database belum disiapkan
+  async function verifyPassword(p){
+    try{
+      const hasil = await Promise.race([
+        db.rpc('verify_admin_password', { p }),
+        new Promise((_, tolak) => setTimeout(() => tolak(new Error('Database tidak menjawab (timeout 5 detik)')), 5000))
+      ]);
+      if(hasil.error) throw hasil.error;
+      // Jawaban selain true/false = fungsi SQL belum siap, BUKAN sandi salah.
+      // Tanpa baris ini Anda bisa terkunci lagi seperti kemarin.
+      if(typeof hasil.data !== 'boolean') throw new Error('RPC membalas ' + JSON.stringify(hasil.data));
+      console.log('Kata sandi diperiksa lewat database.');
+      return hasil.data === true;
+    }catch(e){
+      console.warn('Cek kata sandi lewat database gagal → memakai cara cadangan. Sebab:', e.message);
+      return p === PASS_CADANGAN;
+    }
+  }
   async function loadSettings(){
     try{
       const { data } = await db.from('settings').select('*');
@@ -515,36 +512,26 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     }catch(e){ console.error(e); toast('Gagal menyimpan. Pastikan SQL pengaturan sudah dijalankan.'); }
   }
   async function changePassword(){
-    const oldP = document.getElementById('setOldPass').value;
-    const newP = document.getElementById('setNewPass').value;
-    const newP2 = document.getElementById('setNewPass2').value;
+    const oldP = document.getElementById('setOldPass').value.trim();
+    const newP = document.getElementById('setNewPass').value.trim();
+    const newP2 = document.getElementById('setNewPass2').value.trim();
     if(!oldP || !newP){ toast('Isi kata sandi lama dan baru'); return; }
     if(newP.length < 6){ toast('Kata sandi baru minimal 6 karakter'); return; }
     if(newP !== newP2){ toast('Ulangi kata sandi tidak cocok'); return; }
     try{
-      // buktikan dulu pemegang kata sandi lama memang Anda
-      const { data: { user } } = await db.auth.getUser();
-      const cek = await db.auth.signInWithPassword({ email: user.email, password: oldP });
-      if(cek.error){ toast('Kata sandi lama salah'); return; }
-
-      const { error } = await db.auth.updateUser({ password: newP });
+      const { data, error } = await db.rpc('change_admin_password', { old_p: oldP, new_p: newP });
       if(error) throw error;
-      toast('Kata sandi berhasil diubah');
-      ['setOldPass','setNewPass','setNewPass2'].forEach(id => document.getElementById(id).value='');
-    }catch(e){ console.error(e); toast('Gagal mengubah: ' + e.message); }
+      if(data === true){
+        toast('Kata sandi berhasil diubah');
+        ['setOldPass','setNewPass','setNewPass2'].forEach(id => document.getElementById(id).value='');
+      } else { toast('Kata sandi lama salah'); }
+    }catch(e){ console.error(e); toast('Gagal mengubah. Pastikan SQL pengaturan sudah dijalankan.'); }
   }
   const pasangTombol = (id, fn) => { const el = document.getElementById(id); if(el) el.onclick = fn; };
   pasangTombol('saveSettingsBtn', saveSettings);
   pasangTombol('savePassBtn', changePassword);
 
-  async function muatSemua(){ await loadDB(); renderAll(); subscribeRealtime(); loadSettings(); }
-
-  // Sesi tersimpan di browser: kalau masih berlaku, langsung masuk tanpa login ulang.
-  (async function init(){
-    if(!db) return;
-    const { data: { session } } = await db.auth.getSession();
-    if(session){ showAccount(session.user.email); tampilkanDasbor(); await muatSemua(); }
-  })();
+  (async function init(){ await loadDB(); renderAll(); subscribeRealtime(); loadSettings(); })();
 
   // ===== SLIDESHOW PANEL LOGIN (geser kanan ke kiri, otomatis) =====
   (function(){
@@ -568,11 +555,8 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
   })();
 
   // keluar: kembali ke layar login
-  document.getElementById('logoutBtn').addEventListener('click', async () => {
-    if(db) await db.auth.signOut();   // akhiri sesi di server, bukan cuma sembunyikan layar
+  document.getElementById('logoutBtn').addEventListener('click', () => {
     document.getElementById('adminApp').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'grid';
-    const u = document.getElementById('username'); if(u) u.value = '';
-    const p = document.getElementById('password'); if(p) p.value = '';
     window.scrollTo(0,0);
   });
