@@ -110,18 +110,89 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     if (u !== 'chandy'){ userInput.classList.add('invalid'); showError('Nama pengguna tidak ditemukan.'); return; }
     if (!(await verifyPassword(p))){ pass.classList.add('invalid'); showError('Kata sandi salah.'); return; }
 
-    // ===== kata sandi benar → langsung masuk =====
+    // ===== kata sandi benar → minta PIN keamanan =====
     if (errBox) errBox.classList.remove('show');
     clearInvalid();
-    showAccount(u);
-    showSuccessScreen(u, () => {
-      document.getElementById('loginScreen').style.display = 'none';
-      const adminApp = document.getElementById('adminApp');
-      adminApp.style.display = 'block';
-      adminApp.classList.remove('fade-in'); void adminApp.offsetWidth; adminApp.classList.add('fade-in');
-      window.scrollTo(0,0);
+    askPin(() => {
+      showAccount(u);
+      showSuccessScreen(u, () => {
+        document.getElementById('loginScreen').style.display = 'none';
+        const adminApp = document.getElementById('adminApp');
+        adminApp.style.display = 'block';
+        adminApp.classList.remove('fade-in'); void adminApp.offsetWidth; adminApp.classList.add('fade-in');
+        window.scrollTo(0,0);
+      });
     });
   });
+
+  /* =========================================================
+     PIN KEAMANAN (lapis kedua)
+     Kalau layar PIN hilang atau database bermasalah, kode ini
+     memilih MELOLOSKAN Anda, bukan mengunci. Terkunci dari panel
+     sendiri jauh lebih merepotkan daripada risikonya.
+     ========================================================= */
+  const PIN_CADANGAN = '123456'; // dipakai HANYA bila database tak bisa dihubungi
+
+  function askPin(onOk){
+    const ov    = document.getElementById('pinOverlay');
+    const input = document.getElementById('pinInput');
+    const err   = document.getElementById('pinErr');
+
+    // layar PIN tidak ada → jangan kunci, langsung masuk
+    if(!ov || !input){ console.warn('Layar PIN tidak ditemukan — login dilanjutkan tanpa PIN.'); onOk(); return; }
+
+    input.value = ''; if(err) err.textContent = ''; input.classList.remove('invalid');
+    ov.classList.add('show');
+    setTimeout(() => input.focus(), 100);
+
+    const okBtn     = document.getElementById('pinOk');
+    const cancelBtn = document.getElementById('pinCancel');
+    const tutup = () => {
+      ov.classList.remove('show');
+      if(okBtn) okBtn.onclick = null;
+      input.onkeydown = null;
+    };
+    if(cancelBtn) cancelBtn.onclick = tutup;   // batal → kembali ke layar login
+
+    const submit = async () => {
+      const v = input.value.trim();
+      if(!v){ if(err) err.textContent = 'PIN wajib diisi.'; input.classList.add('invalid'); return; }
+
+      if(okBtn){ okBtn.disabled = true; okBtn.textContent = 'Memeriksa…'; }
+      const ok = await verifyPin(v);
+      if(okBtn){ okBtn.disabled = false; okBtn.textContent = 'Verifikasi'; }
+
+      if(!ok){
+        if(err) err.textContent = 'PIN salah. Coba lagi.';
+        input.classList.remove('invalid'); void input.offsetWidth; input.classList.add('invalid');
+        input.value = ''; input.focus();
+        return;
+      }
+      tutup(); onOk();
+    };
+    if(okBtn) okBtn.onclick = submit;
+    input.onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); submit(); } };
+  }
+
+  async function verifyPin(v){
+    try{
+      const hasil = await Promise.race([
+        db.rpc('verify_admin_pin', { p: v }),
+        new Promise((_, tolak) => setTimeout(() => tolak(new Error('Database tidak menjawab (timeout 5 detik)')), 5000))
+      ]);
+      if(hasil.error) throw hasil.error;
+
+      // ⬇️ INI YANG MENGUNCI ANDA KEMARIN.
+      // Jawaban null/undefined = fungsi SQL belum siap, BUKAN "PIN salah".
+      if(typeof hasil.data !== 'boolean') throw new Error('RPC verify_admin_pin membalas ' + JSON.stringify(hasil.data));
+
+      console.log('PIN diperiksa lewat database.');
+      return hasil.data === true;
+    }catch(e){
+      console.warn('Cek PIN lewat database gagal → memakai cara cadangan. Sebab:', e.message);
+      return v === PIN_CADANGAN;
+    }
+  }
 
 
 
@@ -527,9 +598,27 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
       } else { toast('Kata sandi lama salah'); }
     }catch(e){ console.error(e); toast('Gagal mengubah. Pastikan SQL pengaturan sudah dijalankan.'); }
   }
+  async function changePin(){
+    const oldP  = document.getElementById('setOldPin').value.trim();
+    const newP  = document.getElementById('setNewPin').value.trim();
+    const newP2 = document.getElementById('setNewPin2').value.trim();
+    if(!oldP || !newP){ toast('Isi PIN lama dan baru'); return; }
+    if(!/^\d{4,6}$/.test(newP)){ toast('PIN baru harus 4-6 angka'); return; }
+    if(newP !== newP2){ toast('Ulangi PIN tidak cocok'); return; }
+    try{
+      const { data, error } = await db.rpc('change_admin_pin', { old_p: oldP, new_p: newP });
+      if(error) throw error;
+      if(data === true){
+        toast('PIN berhasil diubah — jangan lupa samakan PIN_CADANGAN di script.js');
+        ['setOldPin','setNewPin','setNewPin2'].forEach(id => document.getElementById(id).value='');
+      } else { toast('PIN lama salah'); }
+    }catch(e){ console.error(e); toast('Gagal mengubah: ' + e.message); }
+  }
+
   const pasangTombol = (id, fn) => { const el = document.getElementById(id); if(el) el.onclick = fn; };
   pasangTombol('saveSettingsBtn', saveSettings);
   pasangTombol('savePassBtn', changePassword);
+  pasangTombol('savePinBtn', changePin);
 
   (async function init(){ await loadDB(); renderAll(); subscribeRealtime(); loadSettings(); })();
 
