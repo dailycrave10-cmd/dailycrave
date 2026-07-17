@@ -575,6 +575,9 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
       const set = (id,v) => { const el=document.getElementById(id); if(el) el.value=v; };
       set('setWa', get('wa_number')); set('setIg', get('instagram'));
       set('setTiktok', get('tiktok')); set('setFb', get('facebook'));
+      set('setJamBuka',  get('jam_buka')  || '08:00');
+      set('setJamTutup', get('jam_tutup') || '21:00');
+      set('setStatus',   (get('toko_status') || 'buka').toLowerCase());
     }catch(e){ console.error('Gagal memuat pengaturan:', e); }
   }
   async function saveSettings(){
@@ -624,8 +627,27 @@ window.__MENU_IMGS__ = {"IMG1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQAB
     }catch(e){ console.error(e); toast('Gagal mengubah: ' + e.message); }
   }
 
+  async function saveJam(){
+    const status = document.getElementById('setStatus').value;
+    const buka   = document.getElementById('setJamBuka').value;
+    const tutup  = document.getElementById('setJamTutup').value;
+    if(!buka || !tutup){ toast('Isi jam buka dan jam tutup'); return; }
+    try{
+      const { error } = await db.from('settings').upsert([
+        { key:'toko_status', value: status },
+        { key:'jam_buka',    value: buka },
+        { key:'jam_tutup',   value: tutup },
+      ], { onConflict:'key' });
+      if(error) throw error;
+      toast(status === 'tutup'
+        ? 'Toko ditandai TUTUP — pesanan baru akan ditolak'
+        : 'Toko ditandai BUKA — pesanan diterima lagi');
+    }catch(e){ console.error(e); toast('Gagal menyimpan: ' + e.message); }
+  }
+
   const pasangTombol = (id, fn) => { const el = document.getElementById(id); if(el) el.onclick = fn; };
   pasangTombol('saveSettingsBtn', saveSettings);
+  pasangTombol('saveJamBtn', saveJam);
   pasangTombol('savePassBtn', changePassword);
   pasangTombol('savePinBtn', changePin);
 
